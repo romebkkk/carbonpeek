@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CarbonPeek · ¿Cuánto CO₂ emite tu web?</title>
+<meta name="description" content="Calcula la huella de CO2 de una página web por visita, obtén una nota y una insignia compartible. Gratis, en tu navegador, basado en el modelo Sustainable Web Design.">
+<style>
+  :root{--bg:#08130e;--card:#10201a;--line:#1f3a2e;--txt:#eafff4;--mut:#9fc7b4;--accent:#22c55e}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:radial-gradient(900px 480px at 50% -10%,#123a2a,var(--bg) 60%);color:var(--txt);line-height:1.55}
+  .wrap{max-width:720px;margin:0 auto;padding:0 18px}
+  header{text-align:center;padding:30px 0 6px}
+  .logo{font-size:1.6rem;font-weight:800}.logo b{color:var(--accent)}
+  header p{color:var(--mut);margin:.3em 0 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin:16px 0}
+  label{display:block;font-weight:600;margin:10px 0 4px}
+  input[type=number]{width:100%;background:#08130e;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:1.1rem}
+  .row{display:flex;align-items:center;gap:10px;margin-top:12px;color:var(--mut);font-size:.95rem}
+  .btn{cursor:pointer;border:0;border-radius:12px;padding:13px 18px;font-size:1rem;font-weight:800;color:#04121a;background:var(--accent);margin-top:14px;width:100%}
+  .btn.sec{background:#16281f;color:var(--txt);border:1px solid var(--line)}
+  .score{display:flex;align-items:center;gap:20px;border:2px solid var(--line);border-radius:16px;padding:20px;margin-top:14px}
+  .grade{font-size:3rem;font-weight:800;line-height:1}
+  .g-ok{color:#22c55e}.g-warn{color:#d97706}.g-bad{color:#dc2626}
+  .score .n{font-size:1.6rem;font-weight:700}.score small{color:var(--mut)}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .stat{flex:1;min-width:120px;background:#08130e;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+  .stat b{display:block;font-size:1.2rem}.stat small{color:var(--mut)}
+  .badge{margin-top:14px;background:#08130e;border:1px solid var(--line);border-radius:12px;padding:14px}
+  pre{background:#050d09;border:1px solid var(--line);border-radius:10px;padding:10px;overflow:auto;font-size:.8rem;color:#bfe}
+  footer{text-align:center;color:var(--mut);font-size:.82rem;padding:24px 0 40px;border-top:1px solid var(--line);margin-top:20px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🌱 Carbon<b>Peek</b></div>
+    <p>¿Cuánto <strong>CO₂</strong> emite tu web por visita? Nota + insignia para presumir de web sostenible.</p>
+  </header>
+
+  <div class="card">
+    <label for="mb">Peso total de la página (MB)</label>
+    <input id="mb" type="number" value="2" step="0.1" min="0">
+    <div class="row"><input type="checkbox" id="green"> <label for="green" style="margin:0">Mi hosting usa energía renovable (green hosting)</label></div>
+    <button class="btn" id="calc">Calcular huella de CO₂</button>
+    <button class="btn sec" id="measure">📏 Medir el peso de ESTA página automáticamente</button>
+    <p style="color:var(--mut);font-size:.82rem;margin-top:10px">💡 El peso de tu web lo sacas de Chrome DevTools (pestaña Network → "transferred") o de PageSpeed Insights.</p>
+  </div>
+
+  <div id="result"></div>
+
+  <footer>
+    Estimación orientativa según el modelo <a href="https://sustainablewebdesign.org/" target="_blank">Sustainable Web Design</a>. Para medir cualquier URL automáticamente hace falta una versión con backend (roadmap).<br>
+    Hecho con ❤️ por <a href="https://dataflowelegance.es" target="_blank">DataFlow Elegance</a> · <a href="https://github.com/romebkkk/carbonpeek" target="_blank">GitHub</a>
+  </footer>
+</div>
+
+<script src="carbonpeek.js"></script>
+<script>
+  var $ = function(s){ return document.querySelector(s); };
+  var C = window.CarbonPeek;
+
+  $("#calc").onclick = function(){
+    var bytes = (parseFloat($("#mb").value)||0) * 1048576;
+    render(C.estimate(bytes, { greenHost: $("#green").checked }));
+  };
+
+  $("#measure").onclick = function(){
+    try{
+      var res = performance.getEntriesByType("resource");
+      var total = performance.getEntriesByType("navigation").reduce(function(a,n){return a+(n.transferSize||0);},0);
+      res.forEach(function(r){ total += (r.transferSize||0); });
+      if(total<=0){ alert("El navegador no expone el tamaño (transferSize). Introduce el peso a mano."); return; }
+      $("#mb").value = Math.round((total/1048576)*100)/100;
+      render(C.estimate(total, { greenHost: $("#green").checked }));
+    }catch(e){ alert("No se pudo medir automáticamente. Introduce el peso a mano."); }
+  };
+
+  function render(r){
+    var cls = (r.grade==="A+"||r.grade==="A") ? "g-ok" : (r.grade==="B"||r.grade==="C") ? "g-warn" : "g-bad";
+    var svg = C.badgeSVG(r);
+    var embed = '<a href="https://github.com/romebkkk/carbonpeek"><img alt="CarbonPeek" src="data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)))+'"></a>';
+    $("#result").innerHTML =
+      '<div class="card">'+
+        '<div class="score"><div class="grade '+cls+'">'+r.grade+'</div>'+
+          '<div><div class="n">'+r.grams_co2+' g CO₂ / visita</div><small>peso: '+r.mb+' MB · '+r.kwh+' kWh</small></div></div>'+
+        '<div class="stats">'+
+          '<div class="stat"><b>'+r.kg_per_10k_visits+' kg</b><small>CO₂ / 10.000 visitas al mes</small></div>'+
+          '<div class="stat"><b>'+(r.green_host?"Sí":"No")+'</b><small>Hosting renovable</small></div>'+
+        '</div>'+
+        '<div class="badge"><div style="margin-bottom:8px">'+svg+'</div>'+
+          '<small style="color:var(--mut)">Pega esta insignia en tu web o README:</small>'+
+          '<pre>'+embed.replace(/</g,"&lt;")+'</pre></div>'+
+        '<div class="badge" style="margin-top:10px"><strong>Cómo reducirla:</strong> comprime imágenes (WebP/AVIF), usa lazy-load, quita JS/fuentes que no uses, activa caché y CDN, y elige un hosting con energía renovable.</div>'+
+      '</div>';
+    $("#result").scrollIntoView({behavior:"smooth"});
+  }
+  $("#calc").click();
+</script>
+</body>
+</html>
